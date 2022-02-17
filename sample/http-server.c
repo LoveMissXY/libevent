@@ -49,6 +49,15 @@
 #include <event2/util.h>
 #include <event2/keyvalq_struct.h>
 
+#include <event2/bufferevent_ssl.h>
+#include <event2/bufferevent.h>
+
+#include <openssl/ssl.h>
+#include <openssl/err.h>
+#include <openssl/rand.h>
+
+
+
 #ifdef _WIN32
 #include <event2/thread.h>
 #endif /* _WIN32 */
@@ -107,6 +116,8 @@ struct options {
 	int unlink;
 	const char *unixsock;
 	const char *docroot;
+	const char *cer;
+	const char *key;
 };
 
 /* Try to guess a good content-type for 'path' */
@@ -352,6 +363,7 @@ print_usage(FILE *out, const char *prog, int exit_code)
 		" -U      - bind to unix socket\n"
 		" -u      - unlink unix socket before bind\n"
 		" -I      - IOCP\n"
+		" -c -k   - openssl cer and key\n"
 		" -v      - verbosity, enables libevent debug logging too\n", prog);
 	exit(exit_code);
 }
@@ -363,13 +375,15 @@ parse_opts(int argc, char **argv)
 
 	memset(&o, 0, sizeof(o));
 
-	while ((opt = getopt(argc, argv, "hp:U:uIv")) != -1) {
+	while ((opt = getopt(argc, argv, "hp:U:uIvc:k:")) != -1) {
 		switch (opt) {
 			case 'p': o.port = atoi(optarg); break;
 			case 'U': o.unixsock = optarg; break;
 			case 'u': o.unlink = 1; break;
 			case 'I': o.iocp = 1; break;
 			case 'v': ++o.verbose; break;
+			case 'c': o.cer = optarg; break;
+			case 'k': o.key = optarg; break;
 			case 'h': print_usage(stdout, argv[0], 0); break;
 			default : fprintf(stderr, "Unknown option %c\n", opt); break;
 		}
@@ -441,6 +455,20 @@ display_listen_sock(struct evhttp_bound_socket *handle)
 
 	return 0;
 }
+static struct 
+bufferevent* bevcb (struct event_base *base, void *arg)
+{ 
+    struct bufferevent* r;
+
+	if (NULL == arg) {
+		r = bufferevent_socket_new(base, -1, BEV_OPT_CLOSE_ON_FREE);
+	} else {
+	    SSL_CTX *ssl_ctx = (SSL_CTX *) arg;
+	    r = bufferevent_openssl_socket_new (base, -1,
+	            SSL_new (ssl_ctx),  BUFFEREVENT_SSL_ACCEPTING, BEV_OPT_CLOSE_ON_FREE);
+	}
+ 	return r;
+}
 
 int
 main(int argc, char **argv)
@@ -453,6 +481,10 @@ main(int argc, char **argv)
 	struct event *term = NULL;
 	struct options o = parse_opts(argc, argv);
 	int ret = 0;
+
+	SSL_CTX *ssl_ctx = NULL;
+	//SSL *ssl = NULL;
+	EC_KEY *ecdh = NULL;
 
 #ifdef _WIN32
 	{
@@ -494,6 +526,66 @@ main(int argc, char **argv)
 	event_config_free(cfg);
 	cfg = NULL;
 
+	if(o.cer && o.key){
+#if (OPENSSL_VERSION_NUMBER < 0x10100000L) || \
+			(defined(LIBRESSL_VERSION_NUMBER) && LIBRESSL_VERSION_NUMBER < 0x20700000L)
+			// Initialize OpenSSL
+			SSL_library_init();
+			ERR_load_crypto_strings();
+			SSL_load_error_strings();
+			OpenSSL_add_all_algorithms();
+#endif
+
+			/* Create a new OpenSSL context */
+			ssl_ctx = SSL_CTX_new(SSLv23_method());
+			if (!ssl_ctx) {
+				fprintf(stderr, "SSL_CTX_new\n");
+				ret = 1;
+				goto err;
+			}
+
+		    SSL_CTX_set_options (ssl_ctx,
+		            SSL_OP_SINGLE_DH_USE |
+		            SSL_OP_SINGLE_ECDH_USE |
+		            SSL_OP_NO_SSLv2);
+
+		    ecdh = EC_KEY_new_by_curve_name (NID_X9_62_prime256v1);
+		    if (! ecdh){
+		        fprintf(stderr, "EC_KEY_new_by_curve_name\n");
+		        ret = 1;
+				goto err;
+		    }
+		    if (1 != SSL_CTX_set_tmp_ecdh (ssl_ctx, ecdh)){
+		        fprintf(stderr, "SSL_CTX_set_tmp_ecdh\n");
+		        ret = 1;
+				goto err;
+		    }
+
+
+		    printf ("Loading certificate chain from '%s'\n"
+		            "and private key from '%s'\n",
+		            o.cer, o.key);
+
+		    if (1 != SSL_CTX_use_certificate_chain_file (ssl_ctx, o.cer)){
+		        fprintf(stderr, "SSL_CTX_use_certificate_chain_file\n");
+		        ret = 1;
+				goto err;
+		    }
+
+		    if (1 != SSL_CTX_use_PrivateKey_file (ssl_ctx, o.key, SSL_FILETYPE_PEM)){
+		        fprintf(stderr, "SSL_CTX_use_PrivateKey_file\n");
+		        ret = 1;
+				goto err;
+		    }
+
+		    if (1 != SSL_CTX_check_private_key (ssl_ctx)){
+		        fprintf(stderr, "SSL_CTX_check_private_key\n");
+		        ret = 1;
+				goto err;
+		    }
+	}
+
+
 	/* Create a new evhttp object to handle requests. */
 	http = evhttp_new(base);
 	if (!http) {
@@ -507,6 +599,8 @@ main(int argc, char **argv)
 	/* We want to accept arbitrary requests, so we need to set a "generic"
 	 * cb.  We can also add callbacks for specific paths. */
 	evhttp_set_gencb(http, send_document_cb, &o);
+
+    evhttp_set_bevcb(http, bevcb, ssl_ctx);
 
 	if (o.unixsock) {
 #ifdef EVENT__HAVE_STRUCT_SOCKADDR_UN
@@ -577,6 +671,29 @@ err:
 		event_free(term);
 	if (base)
 		event_base_free(base);
+
+	if (ssl_ctx)
+		SSL_CTX_free(ssl_ctx);
+	if(ecdh)
+		EC_KEY_free(ecdh);
+	//if (type == HTTP && ssl)
+	//	SSL_free(ssl);
+#if (OPENSSL_VERSION_NUMBER < 0x10100000L) || \
+	(defined(LIBRESSL_VERSION_NUMBER) && LIBRESSL_VERSION_NUMBER < 0x20700000L)
+	EVP_cleanup();
+	ERR_free_strings();
+
+#if OPENSSL_VERSION_NUMBER < 0x10000000L
+	ERR_remove_state(0);
+#else
+	ERR_remove_thread_state(NULL);
+#endif
+
+	CRYPTO_cleanup_all_ex_data();
+
+	sk_SSL_COMP_free(SSL_COMP_get_compression_methods());
+#endif /* (OPENSSL_VERSION_NUMBER < 0x10100000L) || \
+	(defined(LIBRESSL_VERSION_NUMBER) && LIBRESSL_VERSION_NUMBER < 0x20700000L) */
 
 	return ret;
 }

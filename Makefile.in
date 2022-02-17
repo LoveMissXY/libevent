@@ -1558,7 +1558,7 @@ sample/http-server.$(OBJEXT): sample/$(am__dirstamp) \
 
 sample/http-server$(EXEEXT): $(sample_http_server_OBJECTS) $(sample_http_server_DEPENDENCIES) $(EXTRA_sample_http_server_DEPENDENCIES) sample/$(am__dirstamp)
 	@rm -f sample/http-server$(EXEEXT)
-	$(AM_V_CCLD)$(LINK) $(sample_http_server_OBJECTS) $(sample_http_server_LDADD) $(LIBS)
+	$(AM_V_CCLD)$(LINK) $(sample_http_server_OBJECTS) $(sample_http_server_LDADD)　$(sample_https_client_LDADD) $(LIBS)
 sample/https_client-https-client.$(OBJEXT): sample/$(am__dirstamp) \
 	sample/$(DEPDIR)/$(am__dirstamp)
 sample/https_client-hostcheck.$(OBJEXT): sample/$(am__dirstamp) \
