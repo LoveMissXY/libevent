@@ -11,7 +11,7 @@
 
 # Modified part
 
-Add OpenSSL support for simple/http-server.
+Add OpenSSL support for (libevent-2.1.12-stable)simple/http-server.
 I have not developed any projects using OpenSSL, So I don't know if my changes are correct.
 If you already have a good experience with OpenSSL, my code is just for reference.
 
