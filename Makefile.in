@@ -170,8 +170,8 @@ am__aclocal_m4_deps = $(top_srcdir)/m4/ac_backport_259_ssizet.m4 \
 	$(top_srcdir)/m4/ltsugar.m4 $(top_srcdir)/m4/ltversion.m4 \
 	$(top_srcdir)/m4/lt~obsolete.m4 \
 	$(top_srcdir)/m4/ntp_pkg_config.m4 $(top_srcdir)/configure.ac
-am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
-	$(ACLOCAL_M4)
+am__configure_deps = #$(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
+	#$(ACLOCAL_M4)
 DIST_COMMON = $(srcdir)/Makefile.am $(top_srcdir)/configure \
 	$(am__configure_deps) $(am__dist_bin_SCRIPTS_DIST) \
 	$(am__include_HEADERS_DIST) $(am__include_event2_HEADERS_DIST) \
@@ -1223,8 +1223,10 @@ sample_signal_test_LDADD = $(LIBEVENT_GC_SECTIONS) libevent.la
 sample_dns_example_SOURCES = sample/dns-example.c
 sample_dns_example_LDADD = $(LIBEVENT_GC_SECTIONS) libevent.la
 sample_hello_world_SOURCES = sample/hello-world.c
-sample_hello_world_LDADD = $(LIBEVENT_GC_SECTIONS) libevent.la
-sample_http_server_SOURCES = sample/http-server.c
+sample_hello_world_LDADD = $(LIBEVENT_GC_SECTIONS) libevent.la 
+sample_http_server_SOURCES = sample/http-server.c \
+@OPENSSL_TRUE@  libevent_openssl.la $(OPENSSL_LIBS) \
+@OPENSSL_TRUE@  $(OPENSSL_LIBADD) $(am__append_8)
 sample_http_server_LDADD = $(LIBEVENT_GC_SECTIONS) libevent.la \
 @OPENSSL_TRUE@  libevent_openssl.la $(OPENSSL_LIBS) \
 @OPENSSL_TRUE@  $(OPENSSL_LIBADD) $(am__append_8)
