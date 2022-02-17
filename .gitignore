@@ -79,3 +79,6 @@ test/test-init
 test/test-ratelim
 test/test-time
 test/test-weof
+\#
+am--include-marker
+autom4te.cache/
