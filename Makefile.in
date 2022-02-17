@@ -185,10 +185,10 @@ CONFIG_CLEAN_FILES = libevent.pc libevent_openssl.pc \
 CONFIG_CLEAN_VPATH_FILES =
 @BUILD_REGRESS_TRUE@am__EXEEXT_1 = test/regress$(EXEEXT)
 @OPENSSL_TRUE@am__EXEEXT_2 = sample/le-proxy$(EXEEXT) \
-@OPENSSL_TRUE@	sample/https-client$(EXEEXT)
+@OPENSSL_TRUE@	sample/https-client$(EXEEXT) sample/http-server$(EXEEXT)
 am__EXEEXT_3 = sample/dns-example$(EXEEXT) \
 	sample/event-read-fifo$(EXEEXT) sample/hello-world$(EXEEXT) \
-	sample/http-server$(EXEEXT) sample/http-connect$(EXEEXT) \
+	sample/http-connect$(EXEEXT) \
 	sample/signal-test$(EXEEXT) sample/time-test$(EXEEXT) \
 	$(am__EXEEXT_2)
 @BUILD_SAMPLES_TRUE@am__EXEEXT_4 = $(am__EXEEXT_3)
@@ -1225,7 +1225,9 @@ sample_dns_example_LDADD = $(LIBEVENT_GC_SECTIONS) libevent.la
 sample_hello_world_SOURCES = sample/hello-world.c
 sample_hello_world_LDADD = $(LIBEVENT_GC_SECTIONS) libevent.la
 sample_http_server_SOURCES = sample/http-server.c
-sample_http_server_LDADD = $(LIBEVENT_GC_SECTIONS) libevent.la
+sample_http_server_LDADD = $(LIBEVENT_GC_SECTIONS) libevent.la \
+@OPENSSL_TRUE@  libevent_openssl.la $(OPENSSL_LIBS) \
+@OPENSSL_TRUE@  $(OPENSSL_LIBADD) $(am__append_8)
 sample_http_connect_SOURCES = sample/http-connect.c
 sample_http_connect_LDADD = $(LIBEVENT_GC_SECTIONS) libevent.la
 regress_CPPFLAGS = -DTINYTEST_LOCAL
@@ -1558,7 +1560,7 @@ sample/http-server.$(OBJEXT): sample/$(am__dirstamp) \
 
 sample/http-server$(EXEEXT): $(sample_http_server_OBJECTS) $(sample_http_server_DEPENDENCIES) $(EXTRA_sample_http_server_DEPENDENCIES) sample/$(am__dirstamp)
 	@rm -f sample/http-server$(EXEEXT)
-	$(AM_V_CCLD)$(LINK) $(sample_http_server_OBJECTS) $(sample_http_server_LDADD)　$(sample_https_client_LDADD) $(LIBS)
+	$(AM_V_CCLD)$(LINK) $(sample_http_server_OBJECTS) $(sample_http_server_LDADD) $(LIBS)
 sample/https_client-https-client.$(OBJEXT): sample/$(am__dirstamp) \
 	sample/$(DEPDIR)/$(am__dirstamp)
 sample/https_client-hostcheck.$(OBJEXT): sample/$(am__dirstamp) \
